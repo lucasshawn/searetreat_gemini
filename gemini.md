@@ -1,9 +1,42 @@
 # Sea Retreat P&L & Payout Rules
 
-## API Authentication
-- Load Hospitable PAT from environment variable `HOSPITABLE_PAT`.
-- Endpoint: `https://api.hospitable.com/v2/reservations`
-- Headers: `Authorization: Bearer $HOSPITABLE_PAT`
+## API & Environment Configuration
+
+### Required Environment Variables (`.env`)
+Create a `.env` file in the root directory (refer to [`.env.example`](file:///C:/Users/lucas/source/repos/searetreat_gemini/.env.example)):
+
+```ini
+# Hospitable API Authentication (Required)
+# Endpoint: https://public.api.hospitable.com/v2/reservations
+# Header: Authorization: Bearer $HOSPITABLE_PAT
+HOSPITABLE_PAT=your_hospitable_pat_here
+
+# Email / SMTP Configuration (Optional - for automated Melio invoice delivery)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password_here
+```
+
+### Environment Setup & Variable Reference
+| Variable | Required? | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `HOSPITABLE_PAT` | **Yes** | None | Personal Access Token from Hospitable Dashboard (`Settings > Developer / API Keys`). Required to pull reservation data. |
+| `SMTP_SERVER` | Optional | `smtp.gmail.com` | SMTP host for sending Melio invoice attachment emails via [`src/email_sender.py`](file:///C:/Users/lucas/source/repos/searetreat_gemini/src/email_sender.py). |
+| `SMTP_PORT` | Optional | `587` | SMTP port (typically 587 for TLS or 465 for SSL). |
+| `SMTP_USER` | Optional | None | Sender email account (e.g. Gmail address). |
+| `SMTP_PASS` | Optional | None | SMTP authentication password or App Password. |
+
+---
+
+### Onboarding Walkthrough for Antigravity (New Developers)
+If a developer asks Antigravity to set up or verify their environment:
+1. **Check for `.env`**: Antigravity should check if `.env` exists in the repository root.
+2. **Copy `.env.example`**: If missing, create `.env` copied from [`.env.example`](file:///C:/Users/lucas/source/repos/searetreat_gemini/.env.example).
+3. **Prompt for Hospitable PAT**: Ask the developer to supply their `HOSPITABLE_PAT`.
+4. **Prompt for Optional SMTP Settings**: Ask if they wish to configure automated email invoice dispatches via SMTP.
+5. **Verify API Connection**: Run [`python src/helpers/test_api.py`](file:///C:/Users/lucas/source/repos/searetreat_gemini/src/helpers/test_api.py) to confirm the token is active and retrieving data.
+
 
 ## Month Assignment Rule
 - A reservation belongs to the target calculation month if its checkout date (departure date) falls AFTER the 1st of that month up to the 1st of the following month.
