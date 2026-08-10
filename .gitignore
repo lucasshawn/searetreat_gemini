@@ -1,0 +1,14 @@
+# Environment & Credentials
+.env
+*.env
+
+# Python Cache & Build Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
