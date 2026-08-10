@@ -83,7 +83,8 @@ def run_monthly_pipeline(target_month_override: str = None, send_email: bool = T
         return False
 
     logging.info(f"Executing P&L calculation & PDF invoice generation for {month_label}...")
-    res_dict = calculate_pl_for_month(target_year, target_month, output_dir="722 Milwaukee")
+    res_dict = calculate_pl_for_month(target_year, target_month, output_dir="722 Milwaukee", send_email=send_email)
+
     
     totals = res_dict.get('totals', {})
     logging.info(f"Gross Revenue: ${totals.get('gross_revenue', 0):,.2f}")

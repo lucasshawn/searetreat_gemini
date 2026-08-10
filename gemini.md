@@ -88,6 +88,11 @@ If a developer asks Antigravity to set up or verify their environment:
 - Maximum file size: 10MB
 - Set the due date to today's date + 3
 
+### 7. Single Calculated Month Email Dispatch Rule
+- **Strict Single-Month Scoping:** Every automated run or script execution MUST generate and email invoices ONLY for the single target calculation month (e.g. when processing July 2026, generate and email strictly `PM-PAYOUT-JUL26` and `CLEAN-PAYOUT-JUL26`).
+- **No Historical / Multi-Month Resending:** Do NOT send invoices for previous months (such as June) during a monthly run, and do not trigger email dispatches during manual or historical test runs unless explicitly requested.
+
+
 
 ## Output Deliverables
 - Generate a formatted markdown summary report in terminal.

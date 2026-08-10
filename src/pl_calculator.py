@@ -4,7 +4,8 @@ import re
 from datetime import datetime
 from src.hospitable_api import fetch_reservations
 
-def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwaukee"):
+def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwaukee", send_email: bool = False):
+
     """
     Calculate P&L report for a specific target month according to rules in gemini.md:
     - Month assignment: Checkout date > 1st of month and <= 1st of next month.
@@ -267,17 +268,21 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
     res_dict['html_invoices'] = html_invoices
 
     # Email separate PDF attachments directly to searetreatpa_7498@invoicesmelio.com (1 PDF per email for Melio)
-    import time
-    recipient = "searetreatpa_7498@invoicesmelio.com"
-    sent_all = True
-    for inv_num, vendor, amount, pdf_path in pdf_invoices:
-        subj = f"Invoice {inv_num} - {vendor}"
-        body = f"Attached is invoice {inv_num} for {vendor} (${amount:,.2f})."
-        success = send_invoice_email(recipient, subj, body, attachments=[pdf_path])
-        if not success:
-            sent_all = False
-        time.sleep(1)
-    res_dict['email_sent'] = sent_all
+    if send_email:
+        import time
+        recipient = "searetreatpa_7498@invoicesmelio.com"
+        sent_all = True
+        for inv_num, vendor, amount, pdf_path in pdf_invoices:
+            subj = f"Invoice {inv_num} - {vendor}"
+            body = f"Attached is invoice {inv_num} for {vendor} (${amount:,.2f})."
+            success = send_invoice_email(recipient, subj, body, attachments=[pdf_path])
+            if not success:
+                sent_all = False
+            time.sleep(1)
+        res_dict['email_sent'] = sent_all
+    else:
+        res_dict['email_sent'] = False
+
 
     return res_dict
 
