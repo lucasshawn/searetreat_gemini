@@ -270,6 +270,8 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
     # Email separate PDF attachments directly to searetreatpa_7498@invoicesmelio.com (1 PDF per email for Melio)
     if send_email:
         import time
+        from src.email_sender import send_pl_summary_email
+        
         recipient = "searetreatpa_7498@invoicesmelio.com"
         sent_all = True
         for inv_num, vendor, amount, pdf_path in pdf_invoices:
@@ -279,9 +281,13 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
             if not success:
                 sent_all = False
             time.sleep(1)
-        res_dict['email_sent'] = sent_all
+
+        # Dispatch P&L Summary Email to Owner inbox
+        summary_sent = send_pl_summary_email(res_dict)
+        res_dict['email_sent'] = sent_all and summary_sent
     else:
         res_dict['email_sent'] = False
+
 
 
     return res_dict

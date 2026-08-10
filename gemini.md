@@ -26,6 +26,7 @@ SMTP_PASS=your_app_password_here
 | `SMTP_PORT` | Optional | `587` | SMTP port (typically 587 for TLS or 465 for SSL). |
 | `SMTP_USER` | Optional | None | Sender email account (e.g. Gmail address). |
 | `SMTP_PASS` | Optional | None | SMTP authentication password or App Password. |
+| `OWNER_EMAIL` | Optional | `searetreatpa@gmail.com` | Owner inbox address for receiving monthly P&L Summary HTML emails with attached CSV reports. |
 
 ---
 
@@ -88,12 +89,14 @@ If a developer asks Antigravity to set up or verify their environment:
 - Maximum file size: 10MB
 - Set the due date to today's date + 3
 
-### 7. Single Calculated Month Email Dispatch Rule
+### 7. Single Calculated Month Email Dispatch & Owner Summary Rule
 - **Strict Single-Month Scoping:** Every automated run or script execution MUST generate and email invoices ONLY for the single target calculation month (e.g. when processing July 2026, generate and email strictly `PM-PAYOUT-JUL26` and `CLEAN-PAYOUT-JUL26`).
 - **No Historical / Multi-Month Resending:** Do NOT send invoices for previous months (such as June) during a monthly run, and do not trigger email dispatches during manual or historical test runs unless explicitly requested.
-
+- **Owner P&L Summary Email:** In addition to sending individual PDF invoices to `searetreatpa_7498@invoicesmelio.com`, the pipeline dispatches a formatted HTML P&L Summary Report to the owner inbox (`searetreatpa@gmail.com` / `OWNER_EMAIL`) with the full monthly CSV report attached.
 
 
 ## Output Deliverables
 - Generate a formatted markdown summary report in terminal.
 - Export detailed CSV sheets to a folder named `722 Milwaukee`.
+- Email PDF invoices directly to `searetreatpa_7498@invoicesmelio.com` for Gigi Property Management and Sondra Owens.
+- Email full HTML P&L summary report with attached CSV sheet to the owner inbox (`OWNER_EMAIL` / `searetreatpa@gmail.com`).
