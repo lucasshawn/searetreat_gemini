@@ -99,13 +99,16 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
     for r in rows:
         reservation_table_rows += f"""
         <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">{r['Check-In']} to {r['Check-Out']}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">{r['Guest Name']}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Net Accommodation Rent']:,.2f}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Cleaning Fee (Collected)']:,.2f}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Gross Revenue']:,.2f}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; white-space: nowrap;">{r['Check-In']} to {r['Check-Out']}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0;">{r['Guest Name']}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Gross Accommodation']:,.2f}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Net Accommodation Rent']:,.2f}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['PM Total Payout']:,.2f}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Cleaner Total Payout']:,.2f}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #2b6cb0;">${r['Net Owner Income']:,.2f}</td>
         </tr>
         """
+
 
     body_html = f"""
     <!DOCTYPE html>
@@ -185,10 +188,13 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
                         <tr>
                             <th>Dates</th>
                             <th>Guest</th>
+                            <th style="text-align: right;">Gross Rent</th>
                             <th style="text-align: right;">Net Rent</th>
-                            <th style="text-align: right;">Cleaning</th>
-                            <th style="text-align: right;">Gross</th>
+                            <th style="text-align: right;">Property Mgmt</th>
+                            <th style="text-align: right;">Cleaner Payments</th>
+                            <th style="text-align: right;">Total Profit</th>
                         </tr>
+
                     </thead>
                     <tbody>
                         {reservation_table_rows}
