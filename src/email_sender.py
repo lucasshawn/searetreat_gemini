@@ -85,7 +85,15 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
     rows = result['rows']
     csv_path = result.get('csv_path')
 
-    subject = f"P&L Summary Report - {month_name} {year} - 722 Milwaukee Dr."
+
+    import calendar
+    month_num = list(calendar.month_name).index(month_name) if month_name in calendar.month_name else 7
+    last_day_num = calendar.monthrange(year, month_num)[1]
+    last_day_str = f"{month_num:02d}/{last_day_num:02d}/{year}"
+
+    subject = f"Profit and Loss for Sea Retreat Month End {last_day_str}"
+
+
 
     reservation_table_rows = ""
     for r in rows:
