@@ -97,9 +97,11 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
 
     reservation_table_rows = ""
     for r in rows:
+        platform_name = (r.get('Platform') or 'none').lower()
         reservation_table_rows += f"""
         <tr>
             <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; white-space: nowrap;">{r['Check-In']} to {r['Check-Out']}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0;">{platform_name}</td>
             <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0;">{r['Guest Name']}</td>
             <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Gross Accommodation']:,.2f}</td>
             <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">${r['Net Accommodation Rent']:,.2f}</td>
@@ -108,6 +110,7 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
             <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #2b6cb0;">${r['Net Owner Income']:,.2f}</td>
         </tr>
         """
+
 
 
     body_html = f"""
@@ -187,6 +190,7 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
                     <thead>
                         <tr>
                             <th>Dates</th>
+                            <th>Platform</th>
                             <th>Guest</th>
                             <th style="text-align: right;">Gross Rent</th>
                             <th style="text-align: right;">Net Rent</th>
@@ -194,6 +198,7 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
                             <th style="text-align: right;">Cleaner Payments</th>
                             <th style="text-align: right;">Total Profit</th>
                         </tr>
+
 
                     </thead>
                     <tbody>
