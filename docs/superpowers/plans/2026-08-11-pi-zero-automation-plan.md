@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build, configure, and document the automated headless deployment of the Sea Retreat monthly P&L and Melio invoice pipeline on a Raspberry Pi Zero 2 W (`192.168.68.90`) using native systemd timer and service units with automated failure alerts.
+**Goal:** Build, configure, and document the automated headless deployment of the Sea Retreat monthly P&L and Melio invoice pipeline on a Raspberry Pi Zero 2 W (`192.168.68.90`) using native systemd timer and service units with automated failure alerts and a daily end-to-end endpoint health monitor daemon.
 
-**Architecture:** A systemd timer (`OnCalendar=*-*-02 06:00:00`, `Persistent=true`) triggers a systemd service executing `monthly_automation.py` in an isolated Python 3 virtual environment (`.venv`). Environment variables are loaded from `.env`. Errors are caught by a top-level alert handler that emails failure details to `OWNER_EMAIL`. An automated provisioning script `scripts/setup_pi.sh` builds the environment and installs systemd units.
+**Architecture:** A systemd timer (`OnCalendar=*-*-02 06:00:00`, `Persistent=true`) triggers a systemd service executing `monthly_automation.py` in an isolated Python 3 virtual environment (`.venv`). Environment variables are loaded from `.env`. Errors are caught by a top-level alert handler that emails failure details to `OWNER_EMAIL`. In addition, a daily health check daemon (`src/daily_health_check.py` + `searetreat-healthcheck.timer` running daily at 08:00 AM) probes Hospitable API, SMTP server, and disk health, appending status to `logs/health_history.json` and sending a daily HTML email report with day-over-day status trends (`GREEN`, `YELLOW/ORANGE`, `RED`). An automated provisioning script `scripts/setup_pi.sh` builds the environment and installs both systemd units.
 
 **Tech Stack:** Python 3, Bash, Linux `systemd` (Service & Timer), SMTP (smtplib), pytest.
 
@@ -13,7 +13,8 @@
 - Device IP: `192.168.68.90`
 - Target Remote Path: `/home/pi/searetreat_gemini`
 - Python Virtualenv Path: `/home/pi/searetreat_gemini/.venv`
-- Schedule: `OnCalendar=*-*-02 06:00:00`
+- Monthly Schedule: `OnCalendar=*-*-02 06:00:00`
+- Daily Health Check Schedule: `OnCalendar=*-*-* 08:00:00`
 - Catch-up Behavior: `Persistent=true`
 - Notification Inbox: `searetreatpa@gmail.com` (`OWNER_EMAIL`)
 
@@ -29,122 +30,12 @@
 **Interfaces:**
 - Produces: `send_failure_alert(error_message: str, log_snippet: str = "") -> bool`
 
-- [ ] **Step 1: Write the failing test for `send_failure_alert`**
-
-Create `tests/test_alert_sender.py`:
-```python
-import pytest
-from unittest.mock import patch, MagicMock
-from src.alert_sender import send_failure_alert
-
-def test_send_failure_alert_success():
-    with patch("smtplib.SMTP") as mock_smtp:
-        mock_server = MagicMock()
-        mock_smtp.return_value.__enter__.return_value = mock_server
-        
-        env_vars = {
-            "SMTP_SERVER": "smtp.gmail.com",
-            "SMTP_PORT": "587",
-            "SMTP_USER": "test@gmail.com",
-            "SMTP_PASS": "secret",
-            "OWNER_EMAIL": "owner@gmail.com"
-        }
-        with patch.dict("os.environ", env_vars):
-            success = send_failure_alert("Test API Error", "Traceback details...")
-            assert success is True
-            assert mock_server.sendmail.called
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `pytest tests/test_alert_sender.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'src.alert_sender'`
-
-- [ ] **Step 3: Implement `src/alert_sender.py`**
-
-Create `src/alert_sender.py`:
-```python
-import os
-import smtplib
-import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-def send_failure_alert(error_message: str, log_snippet: str = "") -> bool:
-    """
-    Sends an urgent email notification to OWNER_EMAIL when the monthly automation pipeline fails.
-    """
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_pass = os.getenv("SMTP_PASS", "")
-    owner_email = os.getenv("OWNER_EMAIL", "searetreatpa@gmail.com")
-
-    if not smtp_user or not smtp_pass:
-        logging.error("Cannot send failure alert: SMTP credentials missing in environment.")
-        return False
-
-    try:
-        msg = MIMEMultipart()
-        msg["From"] = smtp_user
-        msg["To"] = owner_email
-        msg["Subject"] = "🚨 URGENT: Sea Retreat Monthly Automation Failed"
-
-        body = (
-            f"Sea Retreat Monthly Automation encountered a critical failure.\n\n"
-            f"Error Details:\n{error_message}\n\n"
-            f"Log Snippet:\n{log_snippet}\n\n"
-            f"Please check your Raspberry Pi Zero (192.168.68.90) logs using:\n"
-            f"journalctl -u searetreat-automation -n 100\n"
-        )
-        msg.attach(MIMEText(body, "plain"))
-
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_user, [owner_email], msg.as_string())
-        
-        logging.info(f"Failure alert email successfully dispatched to {owner_email}.")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to dispatch failure alert email: {e}")
-        return False
-```
-
-- [ ] **Step 4: Update `src/monthly_automation.py` with top-level try/except alert dispatch**
-
-Modify `src/monthly_automation.py`:
-```python
-# Import alert_sender
-from src.alert_sender import send_failure_alert
-
-# Wrap run_monthly_pipeline logic in try/except block
-def run_monthly_pipeline(target_month_override: str = None, send_email: bool = True):
-    setup_logging()
-    try:
-        # existing logic ...
-        return True
-    except Exception as e:
-        import traceback
-        tb_str = traceback.format_exc()
-        logging.error(f"Pipeline crashed with unhandled exception: {e}")
-        logging.error(tb_str)
-        if send_email:
-            send_failure_alert(str(e), tb_str)
-        return False
-```
-
-- [ ] **Step 5: Run test to verify it passes**
-
-Run: `pytest tests/test_alert_sender.py -v`
-Expected: PASS
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/alert_sender.py src/monthly_automation.py tests/test_alert_sender.py
-git commit -m "feat: add pipeline failure alert email handler"
-```
+- [x] **Step 1: Write the failing test for `send_failure_alert`**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement `src/alert_sender.py`**
+- [x] **Step 4: Update `src/monthly_automation.py` with top-level try/except alert dispatch**
+- [x] **Step 5: Run test to verify it passes**
+- [x] **Step 6: Commit** (`9ac14cc`)
 
 ---
 
@@ -159,89 +50,12 @@ git commit -m "feat: add pipeline failure alert email handler"
 - Systemd Service file format matching Debian/Raspberry Pi OS requirements.
 - Systemd Timer configured for `OnCalendar=*-*-02 06:00:00` and `Persistent=true`.
 
-- [ ] **Step 1: Write verification test for Systemd files**
-
-Create `tests/test_systemd_files.py`:
-```python
-import os
-import pytest
-
-def test_systemd_service_content():
-    service_path = os.path.join("systemd", "searetreat-automation.service")
-    assert os.path.exists(service_path)
-    with open(service_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    assert "[Unit]" in content
-    assert "[Service]" in content
-    assert "WorkingDirectory=/home/pi/searetreat_gemini" in content
-    assert "EnvironmentFile=/home/pi/searetreat_gemini/.env" in content
-    assert "ExecStart=/home/pi/searetreat_gemini/.venv/bin/python /home/pi/searetreat_gemini/src/monthly_automation.py" in content
-
-def test_systemd_timer_content():
-    timer_path = os.path.join("systemd", "searetreat-automation.timer")
-    assert os.path.exists(timer_path)
-    with open(timer_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    assert "[Unit]" in content
-    assert "[Timer]" in content
-    assert "OnCalendar=*-*-02 06:00:00" in content
-    assert "Persistent=true" in content
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `pytest tests/test_systemd_files.py -v`
-Expected: FAIL with `AssertionError: assert False (path does not exist)`
-
-- [ ] **Step 3: Create `systemd/searetreat-automation.service`**
-
-Create `systemd/searetreat-automation.service`:
-```ini
-[Unit]
-Description=Sea Retreat Monthly P&L and Melio Invoice Automation
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-User=pi
-WorkingDirectory=/home/pi/searetreat_gemini
-EnvironmentFile=/home/pi/searetreat_gemini/.env
-ExecStart=/home/pi/searetreat_gemini/.venv/bin/python /home/pi/searetreat_gemini/src/monthly_automation.py
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-```
-
-- [ ] **Step 4: Create `systemd/searetreat-automation.timer`**
-
-Create `systemd/searetreat-automation.timer`:
-```ini
-[Unit]
-Description=Timer for Sea Retreat Monthly Automation (2nd of every month at 06:00 AM)
-
-[Timer]
-OnCalendar=*-*-02 06:00:00
-Persistent=true
-Unit=searetreat-automation.service
-
-[Install]
-WantedBy=timers.target
-```
-
-- [ ] **Step 5: Run test to verify it passes**
-
-Run: `pytest tests/test_systemd_files.py -v`
-Expected: PASS
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add systemd/searetreat-automation.service systemd/searetreat-automation.timer tests/test_systemd_files.py
-git commit -m "feat: add systemd service and timer unit configuration files"
-```
+- [x] **Step 1: Write verification test for Systemd files**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Create `systemd/searetreat-automation.service`**
+- [x] **Step 4: Create `systemd/searetreat-automation.timer`**
+- [x] **Step 5: Run test to verify it passes**
+- [x] **Step 6: Commit** (`6d56c6f`)
 
 ---
 
@@ -271,6 +85,7 @@ def test_setup_pi_script_exists_and_valid_bash():
     assert "python3 -m venv .venv" in content
     assert "pip install" in content
     assert "searetreat-automation.service" in content
+    assert "searetreat-healthcheck.service" in content
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -335,10 +150,15 @@ echo "[5/5] Installing systemd units..."
 if [ -d "/etc/systemd/system" ]; then
     sudo cp systemd/searetreat-automation.service /etc/systemd/system/
     sudo cp systemd/searetreat-automation.timer /etc/systemd/system/
+    if [ -f "systemd/searetreat-healthcheck.service" ]; then
+        sudo cp systemd/searetreat-healthcheck.service /etc/systemd/system/
+        sudo cp systemd/searetreat-healthcheck.timer /etc/systemd/system/
+    fi
     sudo systemctl daemon-reload
     echo "Installed systemd units successfully."
-    echo "To activate the timer, run:"
+    echo "To activate the timers, run:"
     echo "  sudo systemctl enable --now searetreat-automation.timer"
+    echo "  sudo systemctl enable --now searetreat-healthcheck.timer"
 else
     echo "Non-systemd environment detected. Manual copy to /etc/systemd/system required."
 fi
@@ -383,6 +203,7 @@ def test_pi_zero_setup_doc_exists():
         content = f.read()
     assert "192.168.68.90" in content
     assert "systemctl enable --now searetreat-automation.timer" in content
+    assert "systemctl enable --now searetreat-healthcheck.timer" in content
     assert "journalctl -u searetreat-automation" in content
 ```
 
@@ -397,7 +218,7 @@ Create `docs/pi_zero_setup.md`:
 ```markdown
 # Raspberry Pi Zero 2 W Setup & Operational Guide
 
-This document provides step-by-step instructions for deploying and managing the **Sea Retreat Monthly P&L & Melio Invoice Automation** on a Raspberry Pi Zero 2 W.
+This document provides step-by-step instructions for deploying and managing the **Sea Retreat Monthly P&L & Melio Invoice Automation** and the **Daily Health Check Daemon** on a Raspberry Pi Zero 2 W.
 
 ---
 
@@ -453,31 +274,38 @@ This document provides step-by-step instructions for deploying and managing the 
 
 ---
 
-## 4. Enabling the Monthly Systemd Timer
+## 4. Enabling Systemd Timers
 
-Enable and start the systemd timer unit:
+Enable and start both the monthly automation and daily health check timers:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now searetreat-automation.timer
+sudo systemctl enable --now searetreat-healthcheck.timer
 ```
 
-Verify that the timer is scheduled active:
+Verify that the timers are active:
 ```bash
-systemctl list-timers searetreat-automation.timer
+systemctl list-timers searetreat*
 ```
-*Expected Schedule:* Next trigger on the 2nd of the month at `06:00:00`.
+*Expected Schedules:*
+- Monthly Automation: Next trigger on the 2nd of the month at `06:00:00`.
+- Daily Health Check: Next trigger every day at `08:00:00`.
 
 ---
 
 ## 5. Testing & Manual Execution
 
-To perform an immediate manual test run without waiting for the 2nd of the month:
+To perform immediate manual test runs:
 ```bash
-# Test manual run with --no-email flag via virtualenv
+# Test manual monthly pipeline dry run
 .venv/bin/python src/monthly_automation.py --month 2026-07 --no-email
 
-# Test triggering full systemd service directly
+# Test daily health check daemon manually
+.venv/bin/python src/daily_health_check.py
+
+# Test triggering full systemd services directly
 sudo systemctl start searetreat-automation.service
+sudo systemctl start searetreat-healthcheck.service
 ```
 
 ---
@@ -487,16 +315,18 @@ sudo systemctl start searetreat-automation.service
 - **View Live Journalctl Logs:**
   ```bash
   journalctl -u searetreat-automation -f
+  journalctl -u searetreat-healthcheck -f
   ```
 
 - **View Execution File Logs:**
   ```bash
   cat /home/pi/searetreat_gemini/logs/monthly_automation.log
+  cat /home/pi/searetreat_gemini/logs/daily_healthcheck.log
   ```
 
-- **Check Service Status:**
+- **View Health Trend History JSON:**
   ```bash
-  systemctl status searetreat-automation.service
+  cat /home/pi/searetreat_gemini/logs/health_history.json
   ```
 ```
 
@@ -510,4 +340,338 @@ Expected: PASS
 ```bash
 git add docs/pi_zero_setup.md tests/test_docs_exist.py
 git commit -m "docs: add Raspberry Pi Zero setup and operational guide"
+```
+
+---
+
+### Task 5: Daily End-to-End Health Check Daemon & Status Trend Reporter
+
+**Files:**
+- Create: `src/daily_health_check.py`
+- Create: `systemd/searetreat-healthcheck.service`
+- Create: `systemd/searetreat-healthcheck.timer`
+- Test: `tests/test_daily_health_check.py`
+
+**Interfaces:**
+- Produces: `run_daily_health_check(send_email: bool = True) -> dict`
+
+- [ ] **Step 1: Write failing test for `daily_health_check.py`**
+
+Create `tests/test_daily_health_check.py`:
+```python
+import os
+import json
+import pytest
+from unittest.mock import patch, MagicMock
+from src.daily_health_check import check_hospitable_api, check_smtp_connection, check_system_storage, run_daily_health_check
+
+def test_check_hospitable_api_success():
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_resp = MagicMock()
+        mock_resp.getcode.return_value = 200
+        mock_resp.headers = {"X-RateLimit-Remaining": "100"}
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+        
+        status, details = check_hospitable_api("valid_pat")
+        assert status == "GREEN"
+        assert "200 OK" in details
+
+def test_check_smtp_connection_success():
+    with patch("smtplib.SMTP") as mock_smtp:
+        mock_server = MagicMock()
+        mock_smtp.return_value.__enter__.return_value = mock_server
+        
+        status, details = check_smtp_connection("smtp.gmail.com", 587, "user@gmail.com", "pass")
+        assert status == "GREEN"
+
+def test_run_daily_health_check_trend_recording(tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    history_file = log_dir / "health_history.json"
+    
+    with patch("src.daily_health_check.HISTORY_FILE", str(history_file)):
+        with patch("src.daily_health_check.check_hospitable_api", return_value=("GREEN", "OK")):
+            with patch("src.daily_health_check.check_smtp_connection", return_value=("GREEN", "OK")):
+                with patch("src.daily_health_check.check_system_storage", return_value=("GREEN", "Disk space OK")):
+                    with patch("src.daily_health_check.dispatch_health_report_email", return_value=True):
+                        res = run_daily_health_check(send_email=False)
+                        assert res["overall_status"] == "GREEN"
+                        assert os.path.exists(history_file)
+                        with open(history_file) as f:
+                            history = json.load(f)
+                        assert len(history) == 1
+                        assert history[0]["status"] == "GREEN"
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `pytest tests/test_daily_health_check.py -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'src.daily_health_check'`
+
+- [ ] **Step 3: Implement `src/daily_health_check.py`**
+
+Create `src/daily_health_check.py`:
+```python
+import os
+import sys
+import json
+import logging
+import smtplib
+import urllib.request
+import urllib.parse
+import shutil
+from datetime import datetime, date
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from src.hospitable_api import load_pat
+
+HISTORY_FILE = os.path.join(ROOT_DIR, "logs", "health_history.json")
+
+def check_hospitable_api(pat: str) -> tuple[str, str]:
+    if not pat:
+        return "RED", "HOSPITABLE_PAT missing in environment or .env"
+    
+    url = "https://public.api.hospitable.com/v2/properties"
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {pat}",
+        "Accept": "application/json",
+        "User-Agent": "Python/3.11"
+    })
+    
+    try:
+        start_time = datetime.now()
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            latency = (datetime.now() - start_time).total_seconds()
+            code = resp.getcode()
+            
+            # Check warning headers or token format indicators
+            token_status = "GREEN"
+            warning_msg = f"HTTP {code} OK ({latency:.2f}s)"
+            
+            # If PAT is dummy or placeholder
+            if "dummy" in pat.lower() or "your_" in pat.lower():
+                return "ORANGE", "Warning: HOSPITABLE_PAT is a placeholder token."
+            
+            if latency > 5.0:
+                return "YELLOW", f"Warning: High API latency ({latency:.2f}s)"
+                
+            return "GREEN", warning_msg
+    except Exception as e:
+        return "RED", f"API Connection Failed: {e}"
+
+def check_smtp_connection(server_host: str, port: int, user: str, pass_word: str) -> tuple[str, str]:
+    if not user or not pass_word:
+        return "RED", "SMTP credentials missing in environment"
+    try:
+        with smtplib.SMTP(server_host, port, timeout=10) as server:
+            server.starttls()
+            server.login(user, pass_word)
+        return "GREEN", "SMTP authentication successful"
+    except Exception as e:
+        return "RED", f"SMTP Auth Failed: {e}"
+
+def check_system_storage() -> tuple[str, str]:
+    try:
+        total, used, free = shutil.disk_usage(ROOT_DIR)
+        free_gb = free / (1024 ** 3)
+        used_pct = (used / total) * 100
+        if used_pct > 90:
+            return "RED", f"Critical low disk space: {free_gb:.1f}GB free ({used_pct:.1f}% used)"
+        elif used_pct > 80:
+            return "YELLOW", f"Warning low disk space: {free_gb:.1f}GB free ({used_pct:.1f}% used)"
+        return "GREEN", f"Disk space OK: {free_gb:.1f}GB free"
+    except Exception as e:
+        return "YELLOW", f"Disk check unavailable: {e}"
+
+def dispatch_health_report_email(overall_status: str, results: dict, history: list) -> bool:
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    owner_email = os.getenv("OWNER_EMAIL", "searetreatpa@gmail.com")
+
+    if not smtp_user or not smtp_pass:
+        logging.error("Cannot send health report: SMTP credentials unconfigured.")
+        return False
+
+    status_icon = "🟢" if overall_status == "GREEN" else ("🟧" if overall_status in ("YELLOW", "ORANGE") else "🔴")
+    subject = f"{status_icon} Daily Health Report - Sea Retreat Automation [{overall_status}]"
+
+    # Render day-over-day trend row (last 7 days)
+    trend_icons = []
+    for entry in history[-7:]:
+        st = entry.get("status", "GREEN")
+        trend_icons.append("🟢" if st == "GREEN" else ("🟧" if st in ("YELLOW", "ORANGE") else "🔴"))
+    trend_str = " ".join(trend_icons)
+
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+        <h2>{status_icon} Sea Retreat System Health Report</h2>
+        <p><strong>Date:</strong> {date.today().isoformat()}</p>
+        <p><strong>Overall Status:</strong> <span style="font-weight:bold; color:{'#2e7d32' if overall_status=='GREEN' else ('#f57c00' if overall_status in ('YELLOW','ORANGE') else '#c62828')};">{overall_status}</span></p>
+        
+        <h3>Day-over-Day Health Trend (Last 7 Days)</h3>
+        <p style="font-size: 1.4em; letter-spacing: 4px;">{trend_str}</p>
+
+        <h3>Component Diagnostics</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
+            <tr style="background:#f2f2f2;">
+                <th>Component</th>
+                <th>Status</th>
+                <th>Details</th>
+            </tr>
+            <tr>
+                <td>Hospitable API</td>
+                <td><strong>{results['api'][0]}</strong></td>
+                <td>{results['api'][1]}</td>
+            </tr>
+            <tr>
+                <td>SMTP Delivery</td>
+                <td><strong>{results['smtp'][0]}</strong></td>
+                <td>{results['smtp'][1]}</td>
+            </tr>
+            <tr>
+                <td>System Storage</td>
+                <td><strong>{results['storage'][0]}</strong></td>
+                <td>{results['storage'][1]}</td>
+            </tr>
+        </table>
+        <br/>
+        <p style="font-size:0.9em; color:#666;">Executed automatically by Raspberry Pi Zero 2 W (192.168.68.90)</p>
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart()
+    msg["From"] = smtp_user
+    msg["To"] = owner_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, [owner_email], msg.as_string())
+        logging.info(f"Health report successfully sent to {owner_email}.")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to dispatch health report email: {e}")
+        return False
+
+def run_daily_health_check(send_email: bool = True) -> dict:
+    os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+    pat = load_pat()
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+
+    api_st, api_det = check_hospitable_api(pat)
+    smtp_st, smtp_det = check_smtp_connection(smtp_server, smtp_port, smtp_user, smtp_pass)
+    store_st, store_det = check_system_storage()
+
+    statuses = [api_st, smtp_st, store_st]
+    if "RED" in statuses:
+        overall = "RED"
+    elif "ORANGE" in statuses or "YELLOW" in statuses:
+        overall = "YELLOW"
+    else:
+        overall = "GREEN"
+
+    results = {
+        "api": (api_st, api_det),
+        "smtp": (smtp_st, smtp_det),
+        "storage": (store_st, store_det)
+    }
+
+    # Record history
+    history = []
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+
+    today_str = date.today().isoformat()
+    history.append({
+        "date": today_str,
+        "status": overall,
+        "api": api_st,
+        "smtp": smtp_st,
+        "storage": store_st
+    })
+    history = history[-14:]
+
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2)
+
+    if send_email:
+        dispatch_health_report_email(overall, results, history)
+
+    return {
+        "overall_status": overall,
+        "results": results,
+        "history": history
+    }
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    res = run_daily_health_check(send_email=True)
+    print(f"Daily Health Check Complete. Overall Status: {res['overall_status']}")
+```
+
+- [ ] **Step 4: Create `systemd/searetreat-healthcheck.service` and `systemd/searetreat-healthcheck.timer`**
+
+Create `systemd/searetreat-healthcheck.service`:
+```ini
+[Unit]
+Description=Sea Retreat Daily Health Check Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/searetreat_gemini
+EnvironmentFile=/home/pi/searetreat_gemini/.env
+ExecStart=/home/pi/searetreat_gemini/.venv/bin/python /home/pi/searetreat_gemini/src/daily_health_check.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Create `systemd/searetreat-healthcheck.timer`:
+```ini
+[Unit]
+Description=Timer for Sea Retreat Daily Health Check (Runs daily at 08:00 AM)
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+Unit=searetreat-healthcheck.service
+
+[Install]
+WantedBy=timers.target
+```
+
+- [ ] **Step 5: Run tests to verify pass**
+
+Run: `pytest tests/test_daily_health_check.py -v`
+Expected: PASS
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/daily_health_check.py systemd/searetreat-healthcheck.service systemd/searetreat-healthcheck.timer tests/test_daily_health_check.py
+git commit -m "feat: add daily health check daemon and day-over-day status trend reporter"
 ```
