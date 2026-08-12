@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Sea Retreat Daily Health Check (Runs daily at 08:00 AM)
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+Unit=searetreat-healthcheck.service
+
+[Install]
+WantedBy=timers.target
