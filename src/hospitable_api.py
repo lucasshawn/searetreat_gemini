@@ -3,17 +3,28 @@ import urllib.parse
 import json
 import os
 
+def load_env(env_path: str = '.env'):
+    """Load all key-value pairs from .env file into os.environ if missing."""
+    if not os.path.exists(env_path):
+        root_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+        if os.path.exists(root_env):
+            env_path = root_env
+
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    k = k.strip()
+                    v = v.strip().strip('"\'')
+                    if k and not os.environ.get(k):
+                        os.environ[k] = v
+
 def load_pat(env_path: str = '.env') -> str:
     """Load Hospitable PAT from environment or .env file."""
-    if os.environ.get('HOSPITABLE_PAT'):
-        return os.environ.get('HOSPITABLE_PAT')
-    
-    if os.path.exists(env_path):
-        with open(env_path) as f:
-            for line in f:
-                if line.startswith('HOSPITABLE_PAT='):
-                    return line.strip().split('=', 1)[1].strip('"\'')
-    return ""
+    load_env(env_path)
+    return os.environ.get('HOSPITABLE_PAT', '')
 
 def fetch_reservations(start_date: str, end_date: str, property_id: str = "ae163eb2-66be-43b4-af71-2bfa6a2cf854", pat: str = None) -> list:
     """Fetch reservations from Hospitable API with pagination."""

@@ -14,7 +14,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from src.hospitable_api import load_pat
+from src.hospitable_api import load_pat, load_env
 
 HISTORY_FILE = os.path.join(ROOT_DIR, "logs", "health_history.json")
 
@@ -148,6 +148,7 @@ def dispatch_health_report_email(overall_status: str, results: dict, history: li
         return False
 
 def run_daily_health_check(send_email: bool = True) -> dict:
+    load_env()
     os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
     pat = load_pat()
     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
