@@ -48,15 +48,16 @@ fi
 
 # 5. Install systemd service and timer files
 echo "[5/5] Installing systemd units..."
+TARGET_USER="$(whoami)"
 if [ -d "/etc/systemd/system" ]; then
-    sudo cp systemd/searetreat-automation.service /etc/systemd/system/
+    sed -e "s|/home/pi/searetreat_gemini|$SCRIPT_DIR|g" -e "s|User=pi|User=$TARGET_USER|g" systemd/searetreat-automation.service | sudo tee /etc/systemd/system/searetreat-automation.service > /dev/null
     sudo cp systemd/searetreat-automation.timer /etc/systemd/system/
     if [ -f "systemd/searetreat-healthcheck.service" ]; then
-        sudo cp systemd/searetreat-healthcheck.service /etc/systemd/system/
+        sed -e "s|/home/pi/searetreat_gemini|$SCRIPT_DIR|g" -e "s|User=pi|User=$TARGET_USER|g" systemd/searetreat-healthcheck.service | sudo tee /etc/systemd/system/searetreat-healthcheck.service > /dev/null
         sudo cp systemd/searetreat-healthcheck.timer /etc/systemd/system/
     fi
     sudo systemctl daemon-reload
-    echo "Installed systemd units successfully."
+    echo "Installed systemd units successfully for user $TARGET_USER at $SCRIPT_DIR."
     echo "To activate the timers, run:"
     echo "  sudo systemctl enable --now searetreat-automation.timer"
     echo "  sudo systemctl enable --now searetreat-healthcheck.timer"
