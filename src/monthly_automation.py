@@ -11,6 +11,7 @@ if ROOT_DIR not in sys.path:
 
 from src.hospitable_api import load_pat
 from src.pl_calculator import calculate_pl_for_month
+from src.alert_sender import send_failure_alert
 
 MONTH_NAMES = ["January", "February", "March", "April", "May", "June", 
                "July", "August", "September", "October", "November", "December"]
@@ -58,47 +59,56 @@ def setup_logging():
 
 def run_monthly_pipeline(target_month_override: str = None, send_email: bool = True):
     setup_logging()
-    logging.info("==========================================")
-    logging.info("Starting Monthly Payout & Melio Automation")
-    
-    if target_month_override:
-        year_str, month_str = target_month_override.split("-")
-        target_year = int(year_str)
-        target_month = int(month_str)
-    else:
-        today = date.today()
-        if today.month == 1:
-            target_year = today.year - 1
-            target_month = 12
+    try:
+        logging.info("==========================================")
+        logging.info("Starting Monthly Payout & Melio Automation")
+        
+        if target_month_override:
+            year_str, month_str = target_month_override.split("-")
+            target_year = int(year_str)
+            target_month = int(month_str)
         else:
-            target_year = today.year
-            target_month = today.month - 1
+            today = date.today()
+            if today.month == 1:
+                target_year = today.year - 1
+                target_month = 12
+            else:
+                target_year = today.year
+                target_month = today.month - 1
 
-    month_label = f"{MONTH_NAMES[target_month - 1]} {target_year}"
-    logging.info(f"Target Month: {month_label} (Year: {target_year}, Month: {target_month})")
-    
-    pat = load_pat()
-    if not pat:
-        logging.error("HOSPITABLE_PAT missing from environment or .env file!")
+        month_label = f"{MONTH_NAMES[target_month - 1]} {target_year}"
+        logging.info(f"Target Month: {month_label} (Year: {target_year}, Month: {target_month})")
+        
+        pat = load_pat()
+        if not pat:
+            logging.error("HOSPITABLE_PAT missing from environment or .env file!")
+            return False
+
+        logging.info(f"Executing P&L calculation & PDF invoice generation for {month_label}...")
+        res_dict = calculate_pl_for_month(target_year, target_month, output_dir="722 Milwaukee", send_email=send_email)
+
+        
+        totals = res_dict.get('totals', {})
+        logging.info(f"Gross Revenue: ${totals.get('gross_revenue', 0):,.2f}")
+        logging.info(f"Cleaner Payout: ${totals.get('cleaner_total', 0):,.2f}")
+        logging.info(f"PM Payout: ${totals.get('pm_total', 0):,.2f}")
+        logging.info(f"Net Owner Income: ${totals.get('net_owner_income', 0):,.2f}")
+        logging.info(f"CSV Report: {res_dict.get('csv_path')}")
+        logging.info(f"Melio CSV Import: {res_dict.get('melio_csv_path')}")
+
+        for inv in res_dict.get('invoices', []):
+            logging.info(f"Generated PDF Invoice ({inv[1]}): {inv[3]}")
+
+        logging.info("Automation pipeline completed successfully.")
+        return True
+    except Exception as e:
+        import traceback
+        tb_str = traceback.format_exc()
+        logging.error(f"Pipeline crashed with unhandled exception: {e}")
+        logging.error(tb_str)
+        if send_email:
+            send_failure_alert(str(e), tb_str)
         return False
-
-    logging.info(f"Executing P&L calculation & PDF invoice generation for {month_label}...")
-    res_dict = calculate_pl_for_month(target_year, target_month, output_dir="722 Milwaukee", send_email=send_email)
-
-    
-    totals = res_dict.get('totals', {})
-    logging.info(f"Gross Revenue: ${totals.get('gross_revenue', 0):,.2f}")
-    logging.info(f"Cleaner Payout: ${totals.get('cleaner_total', 0):,.2f}")
-    logging.info(f"PM Payout: ${totals.get('pm_total', 0):,.2f}")
-    logging.info(f"Net Owner Income: ${totals.get('net_owner_income', 0):,.2f}")
-    logging.info(f"CSV Report: {res_dict.get('csv_path')}")
-    logging.info(f"Melio CSV Import: {res_dict.get('melio_csv_path')}")
-
-    for inv in res_dict.get('invoices', []):
-        logging.info(f"Generated PDF Invoice ({inv[1]}): {inv[3]}")
-
-    logging.info("Automation pipeline completed successfully.")
-    return True
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Monthly Payout & Melio Automation")
