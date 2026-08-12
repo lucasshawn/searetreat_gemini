@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for Sea Retreat Monthly Automation (2nd of every month at 06:00 AM)
+
+[Timer]
+OnCalendar=*-*-02 06:00:00
+Persistent=true
+Unit=searetreat-automation.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=Sea Retreat Monthly P&L and Melio Invoice Automation
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/searetreat_gemini
+EnvironmentFile=/home/pi/searetreat_gemini/.env
+ExecStart=/home/pi/searetreat_gemini/.venv/bin/python /home/pi/searetreat_gemini/src/monthly_automation.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
