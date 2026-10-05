@@ -1,0 +1,13 @@
+[Unit]
+Description=Sea Retreat Weekly & MTD P&L Email Report Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=shawn
+WorkingDirectory=/home/shawn/searetreat_gemini
+EnvironmentFile=/home/shawn/searetreat_gemini/.env
+ExecStart=/home/shawn/searetreat_gemini/.venv/bin/python /home/shawn/searetreat_gemini/src/weekly_pl_automation.py
+StandardOutput=journal
+StandardError=journal

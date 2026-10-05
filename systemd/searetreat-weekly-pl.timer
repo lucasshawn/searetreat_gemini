@@ -1,0 +1,9 @@
+[Unit]
+Description=Sea Retreat Weekly & MTD P&L Email Report Timer (Every Sunday at 6:00 AM)
+
+[Timer]
+OnCalendar=Sun *-*-* 06:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

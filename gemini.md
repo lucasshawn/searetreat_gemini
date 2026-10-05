@@ -51,10 +51,14 @@ If a developer asks Antigravity to set up or verify their environment:
 ### 1. Property Manager Payout
 - **Base Fee**: 15% of **Net Accommodation Rent** (`Gross Accommodation + Discounts + Adjustments`, excluding cleaning fees and extra guest fees).
 - **PM Notes Adjustments**: Plus/minus any explicit property manager adjustments documented in reservation notes (e.g., `pm adjustment: +$50`).
+- **Direct Payout Handling Fee**: +3% handling fee added to direct payout (`(PM Base + PM Notes Adjustments) * 0.03`).
+- **Total PM Payout**: `PM Base Fee + PM Notes Adjustments + 3% Handling Fee`.
 
 ### 2. Cleaner Payout
 - 100% of the guest cleaning fee charged on the booking channel goes directly to the cleaner.
 - Plus/minus any explicit cleaner notes adjustments (e.g., `cleaner adjustment: +$40`, `extra clean fee: $40`).
+- **Direct Payout Handling Fee**: +3% handling fee added to direct payout (`(Cleaner Base + Cleaner Notes Adjustments) * 0.03`).
+- **Total Cleaner Payout**: `Cleaner Base Fee + Cleaner Notes Adjustments + 3% Handling Fee`.
 - **Extra Guest Fees are NOT paid to the cleaner** (do not include extra guest fees in cleaner totals or cleaner invoices).
 
 ### 3. Notes Adjustments (Cleaner & Property Manager)
@@ -67,8 +71,8 @@ If a developer asks Antigravity to set up or verify their environment:
 - **Deductions**:
   - Platform Fees (Host Service Fees / Channel Fees)
   - Pass-through Taxes
-  - Property Manager Payout (15% Net Acc Rent + PM Notes Adjustments)
-  - Cleaner Payout (Base Cleaning Fee + Cleaner Notes Adjustments)
+  - Property Manager Payout (15% Net Acc Rent + PM Notes Adjustments + 3% Handling Fee)
+  - Cleaner Payout (Base Cleaning Fee + Cleaner Notes Adjustments + 3% Handling Fee)
 - **Net Owner Income**: Gross Revenue - Total Deductions
 
 ### 5. Generate an Invoice to Property Manager

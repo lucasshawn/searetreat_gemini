@@ -137,6 +137,8 @@ def create_monthly_invoices(result: dict, output_dir: str = "722 Milwaukee") -> 
     ]
     if t['pm_notes'] != 0:
         pm_details.append(("Property Manager Notes Adjustments", 1, t['pm_notes'], t['pm_notes']))
+    if t.get('pm_handling', 0) != 0:
+        pm_details.append(("3% Direct Payout Handling Fee", 1, t['pm_handling'], t['pm_handling']))
 
     pm_html = generate_invoice_html(
         vendor="Gigi Property Management",

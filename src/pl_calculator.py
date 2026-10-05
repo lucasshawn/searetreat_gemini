@@ -47,10 +47,11 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
         fin = r.get('financials', {})
         host_fin = fin.get('host', {})
 
-        # Check if reservation is cancelled (do not include cancelled bookings)
-        status = r.get('status', '').lower()
-        curr_category = (r.get('reservation_status', {}).get('current', {}).get('category') or '').lower()
-        if status == 'cancelled' or curr_category == 'cancelled':
+        # Check if reservation is active and accepted (strictly exclude cancelled, expired, or unaccepted bookings)
+        status = str(r.get('status') or '').lower()
+        res_status = r.get('reservation_status') or {}
+        curr_category = str((res_status.get('current') or {}).get('category') or '').lower()
+        if status != 'accepted' or (curr_category and curr_category != 'accepted'):
             continue
 
         # Gross Accommodation
@@ -88,15 +89,17 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
         # Parse Notes for Adjustments
         note_str = r.get('notes') or ""
         
-        # 1) Property Manager Payout
+        # 1) Property Manager Payout (15% Net Acc + Notes + 3% Direct Handling Fee)
         pm_base_fee = round(net_accommodation * 0.15, 2)
         pm_notes_adj = 0.0
         match_pm = re.search(r'(?:pm|manager)\s*(?:adjustment|fee)?:\s*([+-]?\$?\d+(?:\.\d{2})?)', note_str, re.IGNORECASE)
         if match_pm:
             pm_notes_adj = float(match_pm.group(1).replace('$', ''))
-        pm_payout = round(pm_base_fee + pm_notes_adj, 2)
+        pm_subtotal = round(pm_base_fee + pm_notes_adj, 2)
+        pm_handling_fee = round(pm_subtotal * 0.03, 2)
+        pm_payout = round(pm_subtotal + pm_handling_fee, 2)
 
-        # 2) Cleaner Payout (Base cleaning fee + Notes adjustment; extra guest fees are not paid to cleaner)
+        # 2) Cleaner Payout (Base cleaning fee + Notes adjustment + 3% Direct Handling Fee; extra guest fees are not paid to cleaner)
         cleaner_base = round(cleaning_fee, 2)
         cleaner_extra_guest_payout = 0.0
 
@@ -106,7 +109,9 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
         if match_clean:
             cleaner_notes_adj = float(match_clean.group(1).replace('$', ''))
 
-        cleaner_payout = round(cleaner_base + cleaner_notes_adj, 2)
+        cleaner_subtotal = round(cleaner_base + cleaner_notes_adj, 2)
+        cleaner_handling_fee = round(cleaner_subtotal * 0.03, 2)
+        cleaner_payout = round(cleaner_subtotal + cleaner_handling_fee, 2)
 
         # Net Owner Income
         net_owner_income = round(gross_revenue - platform_fee - host_taxes - pm_payout - cleaner_payout, 2)
@@ -130,9 +135,11 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
             'Taxes': round(host_taxes, 2),
             'PM Base Fee (15% Net Acc)': pm_base_fee,
             'PM Notes Adjustment': pm_notes_adj,
+            'PM Handling Fee (3%)': pm_handling_fee,
             'PM Total Payout': pm_payout,
             'Cleaner Base Fee': cleaner_base,
             'Cleaner Notes Adjustment': cleaner_notes_adj,
+            'Cleaner Handling Fee (3%)': cleaner_handling_fee,
             'Cleaner Total Payout': cleaner_payout,
             'Net Owner Income': net_owner_income,
             'Notes': note_str
@@ -148,8 +155,8 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
         'Gross Accommodation', 'Discounts', 'Adjustments', 'Net Accommodation Rent',
         'Extra Guest Fee (Collected)', 'Cleaning Fee (Collected)', 'Gross Revenue',
         'Platform Fee', 'Taxes',
-        'PM Base Fee (15% Net Acc)', 'PM Notes Adjustment', 'PM Total Payout',
-        'Cleaner Base Fee', 'Cleaner Notes Adjustment', 'Cleaner Total Payout',
+        'PM Base Fee (15% Net Acc)', 'PM Notes Adjustment', 'PM Handling Fee (3%)', 'PM Total Payout',
+        'Cleaner Base Fee', 'Cleaner Notes Adjustment', 'Cleaner Handling Fee (3%)', 'Cleaner Total Payout',
         'Net Owner Income', 'Notes'
     ]
 
@@ -167,10 +174,12 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
     
     tot_pm_base = round(sum(r['PM Base Fee (15% Net Acc)'] for r in rows), 2)
     tot_pm_notes = round(sum(r['PM Notes Adjustment'] for r in rows), 2)
+    tot_pm_handling = round(sum(r['PM Handling Fee (3%)'] for r in rows), 2)
     tot_pm = round(sum(r['PM Total Payout'] for r in rows), 2)
 
     tot_cleaner_base = round(sum(r['Cleaner Base Fee'] for r in rows), 2)
     tot_cleaner_notes = round(sum(r['Cleaner Notes Adjustment'] for r in rows), 2)
+    tot_cleaner_handling = round(sum(r['Cleaner Handling Fee (3%)'] for r in rows), 2)
     tot_cleaner = round(sum(r['Cleaner Total Payout'] for r in rows), 2)
 
     tot_net_owner = round(sum(r['Net Owner Income'] for r in rows), 2)
@@ -185,8 +194,8 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
             f"{tot_gross_acc:.2f}", f"{tot_disc:.2f}", f"{tot_adj:.2f}", f"{tot_net_acc:.2f}",
             f"{tot_extra:.2f}", f"{tot_clean:.2f}", f"{tot_gross:.2f}",
             f"{tot_plat:.2f}", f"{tot_taxes:.2f}",
-            f"{tot_pm_base:.2f}", f"{tot_pm_notes:.2f}", f"{tot_pm:.2f}",
-            f"{tot_cleaner_base:.2f}", f"{tot_cleaner_notes:.2f}", f"{tot_cleaner:.2f}",
+            f"{tot_pm_base:.2f}", f"{tot_pm_notes:.2f}", f"{tot_pm_handling:.2f}", f"{tot_pm:.2f}",
+            f"{tot_cleaner_base:.2f}", f"{tot_cleaner_notes:.2f}", f"{tot_cleaner_handling:.2f}", f"{tot_cleaner:.2f}",
             f"{tot_net_owner:.2f}", ''
         ])
 
@@ -210,7 +219,7 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
             payout_inv_date,
             payout_due_date,
             f"{tot_cleaner:.2f}",
-            f"Base Cleaning: ${tot_cleaner_base:,.2f} | Notes Adj: ${tot_cleaner_notes:,.2f}"
+            f"Base Cleaning: ${tot_cleaner_base:,.2f} | Notes Adj: ${tot_cleaner_notes:,.2f} | 3% Handling: ${tot_cleaner_handling:,.2f}"
         ],
         [
             'Gigi Property Management',
@@ -218,7 +227,7 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
             payout_inv_date,
             payout_due_date,
             f"{tot_pm:.2f}",
-            f"15% Net Acc Rent (${tot_net_acc:,.2f}): ${tot_pm_base:,.2f} | Notes Adj: ${tot_pm_notes:,.2f}"
+            f"15% Net Acc Rent (${tot_net_acc:,.2f}): ${tot_pm_base:,.2f} | Notes Adj: ${tot_pm_notes:,.2f} | 3% Handling: ${tot_pm_handling:,.2f}"
         ]
     ]
 
@@ -248,9 +257,11 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
             'taxes': tot_taxes,
             'pm_base': tot_pm_base,
             'pm_notes': tot_pm_notes,
+            'pm_handling': tot_pm_handling,
             'pm_total': tot_pm,
             'cleaner_base': tot_cleaner_base,
             'cleaner_notes': tot_cleaner_notes,
+            'cleaner_handling': tot_cleaner_handling,
             'cleaner_total': tot_cleaner,
             'net_owner_income': tot_net_owner
         }
@@ -288,8 +299,6 @@ def calculate_pl_for_month(year: int, month: int, output_dir: str = "722 Milwauk
     else:
         res_dict['email_sent'] = False
 
-
-
     return res_dict
 
 def print_markdown_report(result: dict):
@@ -312,12 +321,14 @@ def print_markdown_report(result: dict):
     print(f"\n### DEDUCTIONS")
     print(f"- Platform Fees: ${t['platform_fees']:,.2f}")
     print(f"- Taxes: ${t['taxes']:,.2f}")
-    print(f"- Property Manager Payout (15% Net Acc + Notes): ${t['pm_total']:,.2f}")
+    print(f"- Property Manager Payout (15% Net Acc + Notes + 3% Handling): ${t['pm_total']:,.2f}")
     print(f"  - PM Base Fee (15% Net Acc): ${t['pm_base']:,.2f}")
     print(f"  - PM Notes Adjustments: ${t['pm_notes']:,.2f}")
-    print(f"- Cleaner Payout (Base + Notes): ${t['cleaner_total']:,.2f}")
+    print(f"  - PM 3% Handling Fee: ${t['pm_handling']:,.2f}")
+    print(f"- Cleaner Payout (Base + Notes + 3% Handling): ${t['cleaner_total']:,.2f}")
     print(f"  - Base Cleaning Fees: ${t['cleaner_base']:,.2f}")
     print(f"  - Cleaner Notes Adjustments: ${t['cleaner_notes']:,.2f}")
+    print(f"  - Cleaner 3% Handling Fee: ${t['cleaner_handling']:,.2f}")
     tot_deductions = t['platform_fees'] + t['taxes'] + t['pm_total'] + t['cleaner_total']
     print(f"- Total Deductions: ${tot_deductions:,.2f}")
     

@@ -178,8 +178,8 @@ def send_pl_summary_email(result: dict, recipient_email: str = None, env_path: s
                 <table class="summary-table">
                     <tr><td class="label">Platform Host Fees</td><td class="val">-${t['platform_fees']:,.2f}</td></tr>
                     <tr><td class="label">Pass-through Taxes</td><td class="val">-${t['taxes']:,.2f}</td></tr>
-                    <tr><td class="label">Cleaner Payout (Sondra Owens)</td><td class="val">-${t['cleaner_total']:,.2f}</td></tr>
-                    <tr><td class="label">Property Manager Payout (Gigi PM - 15% Net Acc)</td><td class="val">-${t['pm_total']:,.2f}</td></tr>
+                    <tr><td class="label">Cleaner Payout (Sondra Owens - Base + 3% Handling)</td><td class="val">-${t['cleaner_total']:,.2f}</td></tr>
+                    <tr><td class="label">Property Manager Payout (Gigi PM - 15% Net Acc + 3% Handling)</td><td class="val">-${t['pm_total']:,.2f}</td></tr>
                     <tr class="highlight"><td class="label">Net Owner Income Distributed</td><td class="val">${t['net_owner_income']:,.2f}</td></tr>
                 </table>
             </div>
