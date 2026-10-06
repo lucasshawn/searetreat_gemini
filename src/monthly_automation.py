@@ -10,7 +10,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from src.hospitable_api import load_pat
-from src.pl_calculator import calculate_pl_for_month
+from src.pl_calculator import calculate_pl_for_month, print_markdown_report
 from src.alert_sender import send_failure_alert
 
 MONTH_NAMES = ["January", "February", "March", "April", "May", "June", 
@@ -98,6 +98,8 @@ def run_monthly_pipeline(target_month_override: str = None, send_email: bool = T
 
         for inv in res_dict.get('invoices', []):
             logging.info(f"Generated PDF Invoice ({inv[1]}): {inv[3]}")
+
+        print_markdown_report(res_dict)
 
         logging.info("Automation pipeline completed successfully.")
         return True
