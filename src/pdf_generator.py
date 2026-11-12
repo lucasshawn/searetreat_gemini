@@ -141,7 +141,7 @@ def generate_pdf_invoices(result: dict, output_dir: str = "722 Milwaukee") -> li
 
     # 1. Cleaner PDF Invoice (Vendor: Sondra Owens) - Step 6 Rule
     cleaner_num = f"CLEAN-PAYOUT-{month_abbr}{yr_short}"
-    cleaner_headers = ["Check-In", "Check-Out", "Guest Count", "Clean Fee (Guest)", "Notes Adj", "3% Handling", "Total Fee"]
+    cleaner_headers = ["Check-In", "Check-Out", "Guest Count", "Clean Fee (Guest)", "Notes Adj", "Total Fee"]
     cleaner_rows = []
     
     for r in result['rows']:
@@ -150,9 +150,8 @@ def generate_pdf_invoices(result: dict, output_dir: str = "722 Milwaukee") -> li
         guests = f"{r['Total Guests']} guests"
         clean_base = f"${r['Cleaner Base Fee']:,.2f}"
         notes_adj = f"${r['Cleaner Notes Adjustment']:,.2f}"
-        handling = f"${r.get('Cleaner Handling Fee (3%)', 0):,.2f}"
         payout = f"${r['Cleaner Total Payout']:,.2f}"
-        cleaner_rows.append([arr, dep, guests, clean_base, notes_adj, handling, payout])
+        cleaner_rows.append([arr, dep, guests, clean_base, notes_adj, payout])
 
     cleaner_pdf_path = os.path.join(output_dir, f"Invoice_Sondra_Owens_{cleaner_num}.pdf")
     create_pdf_invoice(
@@ -183,8 +182,6 @@ def generate_pdf_invoices(result: dict, output_dir: str = "722 Milwaukee") -> li
 
     if t['pm_notes'] != 0:
         pm_rows.append(["-", "-", "-", "PM Notes Adjustment", "-", f"${t['pm_notes']:,.2f}"])
-    if t.get('pm_handling', 0) != 0:
-        pm_rows.append(["-", "-", "-", "3% Direct Handling Fee", "-", f"${t['pm_handling']:,.2f}"])
 
     pm_pdf_path = os.path.join(output_dir, f"Invoice_Gigi_PM_{pm_num}.pdf")
     create_pdf_invoice(

@@ -88,20 +88,19 @@ def calculate_pl_for_date_range(start_str: str, end_str: str, label: str):
         match_pm = re.search(r'(?:pm|manager)\s*(?:adjustment|fee)?:\s*([+-]?\$?\d+(?:\.\d{2})?)', note_str, re.IGNORECASE)
         if match_pm:
             pm_notes_adj = float(match_pm.group(1).replace('$', ''))
-        pm_subtotal = round(pm_base_fee + pm_notes_adj, 2)
-        pm_handling_fee = round(pm_subtotal * 0.03, 2)
-        pm_payout = round(pm_subtotal + pm_handling_fee, 2)
+        pm_payout = round(pm_base_fee + pm_notes_adj, 2)
 
         cleaner_base = round(cleaning_fee, 2)
         cleaner_notes_adj = 0.0
         match_cleaner = re.search(r'(?:cleaner|cleaning)\s*(?:adjustment|fee)?:\s*([+-]?\$?\d+(?:\.\d{2})?)', note_str, re.IGNORECASE)
         if match_cleaner:
             cleaner_notes_adj = float(match_cleaner.group(1).replace('$', ''))
-        cleaner_subtotal = round(cleaner_base + cleaner_notes_adj, 2)
-        cleaner_handling_fee = round(cleaner_subtotal * 0.03, 2)
-        cleaner_payout = round(cleaner_subtotal + cleaner_handling_fee, 2)
+        cleaner_payout = round(cleaner_base + cleaner_notes_adj, 2)
 
-        net_owner_income = round(gross_revenue - platform_fee - host_taxes - pm_payout - cleaner_payout, 2)
+        # Credit Card Transaction Fee (3% on Melio billing: PM Payout + Cleaner Payout)
+        cc_fee = round((pm_payout + cleaner_payout) * 0.03, 2)
+
+        net_owner_income = round(gross_revenue - platform_fee - host_taxes - pm_payout - cleaner_payout - cc_fee, 2)
 
         rows.append({
             'Reservation Code': code,
@@ -122,12 +121,11 @@ def calculate_pl_for_date_range(start_str: str, end_str: str, label: str):
             'Taxes': host_taxes,
             'PM Base Fee (15% Net Acc)': pm_base_fee,
             'PM Notes Adjustment': pm_notes_adj,
-            'PM Handling Fee (3%)': pm_handling_fee,
             'PM Total Payout': pm_payout,
             'Cleaner Base Fee': cleaner_base,
             'Cleaner Notes Adjustment': cleaner_notes_adj,
-            'Cleaner Handling Fee (3%)': cleaner_handling_fee,
             'Cleaner Total Payout': cleaner_payout,
+            'Credit Card Fee (3%)': cc_fee,
             'Net Owner Income': net_owner_income,
             'Notes': note_str
         })
@@ -145,12 +143,11 @@ def calculate_pl_for_date_range(start_str: str, end_str: str, label: str):
     tot_taxes = round(sum(r['Taxes'] for r in rows), 2)
     tot_pm_base = round(sum(r['PM Base Fee (15% Net Acc)'] for r in rows), 2)
     tot_pm_notes = round(sum(r['PM Notes Adjustment'] for r in rows), 2)
-    tot_pm_handling = round(sum(r['PM Handling Fee (3%)'] for r in rows), 2)
     tot_pm = round(sum(r['PM Total Payout'] for r in rows), 2)
     tot_cleaner_base = round(sum(r['Cleaner Base Fee'] for r in rows), 2)
     tot_cleaner_notes = round(sum(r['Cleaner Notes Adjustment'] for r in rows), 2)
-    tot_cleaner_handling = round(sum(r['Cleaner Handling Fee (3%)'] for r in rows), 2)
     tot_cleaner = round(sum(r['Cleaner Total Payout'] for r in rows), 2)
+    tot_cc_fee = round(sum(r['Credit Card Fee (3%)'] for r in rows), 2)
     tot_net_owner = round(sum(r['Net Owner Income'] for r in rows), 2)
 
     output_dir = os.path.join(ROOT_DIR, "722 Milwaukee")
@@ -163,8 +160,9 @@ def calculate_pl_for_date_range(start_str: str, end_str: str, label: str):
         'Gross Accommodation', 'Discounts', 'Adjustments', 'Net Accommodation Rent',
         'Extra Guest Fee (Collected)', 'Cleaning Fee (Collected)', 'Gross Revenue',
         'Platform Fee', 'Taxes',
-        'PM Base Fee (15% Net Acc)', 'PM Notes Adjustment', 'PM Handling Fee (3%)', 'PM Total Payout',
-        'Cleaner Base Fee', 'Cleaner Notes Adjustment', 'Cleaner Handling Fee (3%)', 'Cleaner Total Payout',
+        'PM Base Fee (15% Net Acc)', 'PM Notes Adjustment', 'PM Total Payout',
+        'Cleaner Base Fee', 'Cleaner Notes Adjustment', 'Cleaner Total Payout',
+        'Credit Card Fee (3%)',
         'Net Owner Income', 'Notes'
     ]
 
@@ -194,12 +192,11 @@ def calculate_pl_for_date_range(start_str: str, end_str: str, label: str):
             'taxes': tot_taxes,
             'pm_base': tot_pm_base,
             'pm_notes': tot_pm_notes,
-            'pm_handling': tot_pm_handling,
             'pm_total': tot_pm,
             'cleaner_base': tot_cleaner_base,
             'cleaner_notes': tot_cleaner_notes,
-            'cleaner_handling': tot_cleaner_handling,
             'cleaner_total': tot_cleaner,
+            'cc_fee': tot_cc_fee,
             'net_owner_income': tot_net_owner
         }
     }
@@ -279,6 +276,7 @@ def dispatch_weekly_and_mtd_email(weekly_res: dict, mtd_res: dict) -> bool:
                     <tr><td class="label">Platform Fees</td><td class="val">-${w_t['platform_fees']:,.2f}</td></tr>
                     <tr><td class="label">Cleaner Payout (Sondra Owens)</td><td class="val">-${w_t['cleaner_total']:,.2f}</td></tr>
                     <tr><td class="label">Property Manager Payout (15% Net Acc)</td><td class="val">-${w_t['pm_total']:,.2f}</td></tr>
+                    <tr><td class="label">Credit Card Transaction Fee (3% Billing)</td><td class="val">-${w_t.get('cc_fee', 0):,.2f}</td></tr>
                     <tr class="highlight"><td class="label">Weekly Net Owner Income</td><td class="val">${w_t['net_owner_income']:,.2f}</td></tr>
                 </table>
             </div>
@@ -294,6 +292,7 @@ def dispatch_weekly_and_mtd_email(weekly_res: dict, mtd_res: dict) -> bool:
                     <tr><td class="label">Platform Fees MTD</td><td class="val">-${m_t['platform_fees']:,.2f}</td></tr>
                     <tr><td class="label">Cleaner Payouts MTD</td><td class="val">-${m_t['cleaner_total']:,.2f}</td></tr>
                     <tr><td class="label">Property Manager Payouts MTD</td><td class="val">-${m_t['pm_total']:,.2f}</td></tr>
+                    <tr><td class="label">Credit Card Transaction Fees MTD (3%)</td><td class="val">-${m_t.get('cc_fee', 0):,.2f}</td></tr>
                     <tr class="highlight"><td class="label">Month-to-Date Net Owner Income</td><td class="val">${m_t['net_owner_income']:,.2f}</td></tr>
                 </table>
             </div>
